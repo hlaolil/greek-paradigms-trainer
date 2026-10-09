@@ -9,7 +9,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.greekparadigms.ui.theme.GreekParadigmsTheme
 
 data class Form(
     val id: Int = 0,
@@ -19,8 +21,8 @@ data class Form(
 )
 
 val logos = listOf(
-    Form(1, "λόγος (2nd decl.)", "nominative singular", "λόγος"),
-    Form(2, "λόγος (2nd decl.)", "genitive singular", "λόγου"),
+    Form(1,  "λόγος (2nd decl.)", "nominative singular", "λόγος"),
+    Form(2,  "λόγος (2nd decl.)", "genitive singular",   "λόγου"),
     Form(3,  "λόγος (2nd decl.)", "dative singular",     "λόγῳ"),
     Form(4,  "λόγος (2nd decl.)", "accusative singular", "λόγον"),
     Form(5,  "λόγος (2nd decl.)", "vocative singular",   "λόγε"),
@@ -32,8 +34,8 @@ val logos = listOf(
 )
 
 @Composable
-fun FormList(forms: List<Form>) {
-    Column {
+fun FormList(forms: List<Form>, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
         forms.forEach { form ->
             FormRow(form)
         }
@@ -63,5 +65,13 @@ fun FormRow(item: Form) {
             style = MaterialTheme.typography.titleMedium,
             fontFamily = FontFamily.Serif
         )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun FormListPreview() {
+    GreekParadigmsTheme {
+        FormList(logos)
     }
 }
