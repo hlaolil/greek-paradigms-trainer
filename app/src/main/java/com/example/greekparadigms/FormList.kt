@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -13,29 +15,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.greekparadigms.ui.theme.GreekParadigmsTheme
 
-data class Form(
-    val id: Int = 0,
-    val paradigm: String,
-    val slot: String,
-    val form: String
-)
-
-val logos = listOf(
-    Form(1,  "λόγος (2nd decl.)", "nominative singular", "λόγος"),
-    Form(2,  "λόγος (2nd decl.)", "genitive singular",   "λόγου"),
-    Form(3,  "λόγος (2nd decl.)", "dative singular",     "λόγῳ"),
-    Form(4,  "λόγος (2nd decl.)", "accusative singular", "λόγον"),
-    Form(5,  "λόγος (2nd decl.)", "vocative singular",   "λόγε"),
-    Form(6,  "λόγος (2nd decl.)", "nominative plural",   "λόγοι"),
-    Form(7,  "λόγος (2nd decl.)", "genitive plural",     "λόγων"),
-    Form(8,  "λόγος (2nd decl.)", "dative plural",       "λόγοις"),
-    Form(9,  "λόγος (2nd decl.)", "accusative plural",   "λόγους"),
-    Form(10, "λόγος (2nd decl.)", "vocative plural",     "λόγοι"),
-)
-
 @Composable
 fun FormList(forms: List<Form>, modifier: Modifier = Modifier) {
-    Column(modifier = modifier) {
+    Column(modifier = modifier.verticalScroll(rememberScrollState())) {
         forms.forEach { form ->
             FormRow(form)
         }
@@ -52,7 +34,8 @@ fun FormRow(item: Form) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = item.slot,
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = FontFamily.Serif
             )
             Text(
                 text = item.paradigm,
