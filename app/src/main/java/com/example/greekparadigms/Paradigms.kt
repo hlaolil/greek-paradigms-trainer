@@ -1,18 +1,15 @@
 package com.example.greekparadigms
 
-// Paradigms extracted from MorphGNT / SBLGNT.
-// Every form below actually occurs in the Greek New Testament, with its
-// parsing as tagged there. Slots the NT never uses are not listed.
 
-data class Form(
+
+data class Form( //data class to hold a form
     val id: Int = 0,
     val paradigm: String,
     val slot: String,
     val form: String
 )
 
-// λόγος — 2nd decl. masc. (typed from a grammar, so it includes the two
-// vocatives that the New Testament itself never uses)
+//λόγος (2nd decl.) — nominative singular  (10 forms)
 val logos = listOf(
     Form(1,  "λόγος (2nd decl.)", "nominative singular", "λόγος"),
     Form(2,  "λόγος (2nd decl.)", "genitive singular",   "λόγου"),
@@ -67,7 +64,7 @@ val arche = listOf(
 )
 
 // ἡμέρα — 1st decl. fem. (α)  (8 forms)
-// not attested in the NT: vocative singular, vocative plural
+
 val hemera = listOf(
     Form(0, "ἡμέρα — 1st decl. fem. (α)", "nominative singular", "ἡμέρα"),
     Form(1, "ἡμέρα — 1st decl. fem. (α)", "genitive singular", "ἡμέρας"),
@@ -80,7 +77,7 @@ val hemera = listOf(
 )
 
 // ἔργον — 2nd decl. neut.  (8 forms)
-// not attested in the NT: vocative singular, vocative plural
+
 val ergon = listOf(
     Form(0, "ἔργον — 2nd decl. neut.", "nominative singular", "ἔργον"),
     Form(1, "ἔργον — 2nd decl. neut.", "genitive singular", "ἔργου"),
@@ -107,7 +104,7 @@ val pater = listOf(
 )
 
 // πνεῦμα — 3rd decl. neut.  (8 forms)
-// not attested in the NT: vocative singular, vocative plural
+
 val pneuma = listOf(
     Form(0, "πνεῦμα — 3rd decl. neut.", "nominative singular", "πνεῦμα"),
     Form(1, "πνεῦμα — 3rd decl. neut.", "genitive singular", "πνεύματος"),

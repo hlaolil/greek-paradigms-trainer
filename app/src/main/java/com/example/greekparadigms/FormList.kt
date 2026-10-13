@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 import com.example.greekparadigms.ui.theme.GreekParadigmsTheme
 
 @Composable
-fun FormList(forms: List<Form>, modifier: Modifier = Modifier) {
+fun FormList(forms: List<Form>, modifier: Modifier = Modifier) { //shows a list of forms
     Column(modifier = modifier.verticalScroll(rememberScrollState())) {
         forms.forEach { form ->
             FormRow(form)
@@ -25,7 +25,7 @@ fun FormList(forms: List<Form>, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun FormRow(item: Form) {
+fun FormRow(item: Form) { //shows a single form
     Row(
         modifier = Modifier
             .fillMaxWidth()

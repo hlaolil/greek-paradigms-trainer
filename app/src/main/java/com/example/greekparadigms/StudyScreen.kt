@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.example.greekparadigms.ui.theme.GreekParadigmsTheme
 
 @Composable
-fun StudyScreen(
+fun StudyScreen( //shows a list of forms to study
     forms: List<Form>,
     modifier: Modifier = Modifier,
     onAnswer: (Form, Boolean) -> Unit = { _, _ -> }
@@ -35,12 +35,12 @@ fun StudyScreen(
     var revealed by remember { mutableStateOf(false) }
     var correctCount by remember { mutableIntStateOf(0) }
 
-    if (forms.isEmpty()) {
+    if (forms.isEmpty()) { //if there are no forms, show a message
         Text("No forms to study.", modifier = modifier.padding(16.dp))
         return
     }
 
-    if (index >= forms.size) {
+    if (index >= forms.size) { //if all forms have been studied, show a message with the number of correct answers
         Column(
             modifier = modifier.fillMaxSize().padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -60,7 +60,7 @@ fun StudyScreen(
         return
     }
 
-    val current = forms[index]
+    val current = forms[index] //get the current form
 
     Column(
         modifier = modifier.fillMaxSize().padding(24.dp),

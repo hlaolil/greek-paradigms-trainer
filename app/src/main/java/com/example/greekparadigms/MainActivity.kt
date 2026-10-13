@@ -23,49 +23,49 @@ import androidx.compose.ui.unit.dp
 import com.example.greekparadigms.ui.theme.GreekParadigmsTheme
 
 class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+    override fun onCreate(savedInstanceState: Bundle?) { //called when the creen starts
+        super.onCreate(savedInstanceState) //passes the saved state the parent
         enableEdgeToEdge()
-        setContent {
+        setContent { //sets the content of the screen
             GreekParadigmsTheme {
-                var selected by remember { mutableStateOf<Deck?>(null) }
-                var showingPractice by remember { mutableStateOf(true) }
+                var selected by remember { mutableStateOf<Deck?>(null) } //holds the current deck
+                var showingPractice by remember { mutableStateOf(true) } //holds whether to show practice or reference
 
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Column(modifier = Modifier.padding(innerPadding)) {
+                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding -> //padding around the content
+                    Column(modifier = Modifier.padding(innerPadding)) { //passes its children to the content
 
-                        val current = selected
+                        val current = selected //holds the current deck
 
-                        if (current == null) {
+                        if (current == null) { //if no deck is selected, show the deck list
                             DeckListScreen(
                                 decks = decks,
-                                onPick = {
+                                onPick = { //sets selected to the current deck and shows practice
                                     selected = it
                                     showingPractice = true
                                 }
                             )
-                        } else {
+                        } else { //if a deck is selected, show the forms
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(16.dp),
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
-                                OutlinedButton(onClick = { selected = null }) {
+                                OutlinedButton(onClick = { selected = null }) { //sets selected to null and shows reference
                                     Text("Decks")
                                 }
-                                if (showingPractice) {
+                                if (showingPractice) { //if showing practice, show practise button, otherwise show reference button
                                     OutlinedButton(onClick = { showingPractice = false }) {
                                         Text("Reference")
                                     }
-                                } else {
+                                } else { //if showing reference, show reference button, otherwise show practise button
                                     Button(onClick = { showingPractice = true }) {
                                         Text("Practise")
                                     }
                                 }
                             }
 
-                            if (showingPractice) {
+                            if (showingPractice) { //if showing practice, show the practice screen, otherwise show the form list
                                 StudyScreen(forms = current.forms)
                             } else {
                                 FormList(forms = current.forms)

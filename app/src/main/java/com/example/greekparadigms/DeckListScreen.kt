@@ -13,18 +13,18 @@ import androidx.compose.ui.unit.dp
 import com.example.greekparadigms.ui.theme.GreekParadigmsTheme
 
 @Composable
-fun DeckListScreen(
+fun DeckListScreen( //shows a list of decks
     decks: List<Deck>,
     onPick: (Deck) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.padding(16.dp)) {
-        Text(
+    Column(modifier = modifier.padding(16.dp)) { //padding around the content
+        Text( //shows choose a deck text
             text = "Choose a deck",
             style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.padding(bottom = 8.dp)
         )
-        decks.forEach { deck ->
+        decks.forEach { deck -> //for each deck, show a button with the name and number of forms
             Button(
                 onClick = { onPick(deck) },
                 modifier = Modifier
