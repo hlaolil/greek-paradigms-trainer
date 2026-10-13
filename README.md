@@ -6,7 +6,7 @@ I wanted to find out by shipping something small and complete how a native Andro
 
 My purpose was to understand three things I had never worked with: how a declarative UI framework differs from the imperative code I was used to, how state drives what appears on screen, and how to structure an app so that the screens know nothing about where their data comes from.
 
-[Software Demo Video](http://youtube.link.goes.here)
+[Software Demo Video](https://youtu.be/8Wt8cYFHZhY)
 
 # Development Environment
 
