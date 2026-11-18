@@ -6,29 +6,27 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// Set of Material typography styles to start with
+/** Greek is always set in the serif face, which on Android covers polytonic Greek. */
+val GreekFamily = FontFamily.Serif
+
+private val base = Typography()
+
 val Typography = Typography(
+    displayLarge = base.displayLarge.copy(fontFamily = GreekFamily),
+    displayMedium = base.displayMedium.copy(fontFamily = GreekFamily),
+    displaySmall = base.displaySmall.copy(fontFamily = GreekFamily),
+    headlineLarge = base.headlineLarge.copy(fontFamily = GreekFamily, fontWeight = FontWeight.Medium),
+    headlineMedium = base.headlineMedium.copy(fontFamily = GreekFamily, fontWeight = FontWeight.Medium),
+    headlineSmall = base.headlineSmall.copy(fontFamily = GreekFamily, fontWeight = FontWeight.Medium),
+    titleLarge = base.titleLarge.copy(fontFamily = GreekFamily, fontWeight = FontWeight.Medium),
     bodyLarge = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.5.sp
-    )
-    /* Other default text styles to override
-    titleLarge = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Normal,
-        fontSize = 22.sp,
-        lineHeight = 28.sp,
-        letterSpacing = 0.sp
     ),
-    labelSmall = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
-        lineHeight = 16.sp,
-        letterSpacing = 0.5.sp
-    )
-    */
 )
+
+/** Style for a Greek word shown as the answer or prompt of a card. */
+val GreekCardStyle = TextStyle(fontFamily = GreekFamily, fontSize = 40.sp, lineHeight = 48.sp)
