@@ -1,151 +1,394 @@
 package com.example.greekparadigms
 
+/*
+ * The paradigm library. Forms follow the standard Koine paradigms taught in
+ * first-year grammars (λύω as the model regular verb), checked against usage
+ * in the SBL Greek New Testament / MorphGNT.
+ */
 
+private const val M = "Masculine"
+private const val F = "Feminine"
+private const val N = "Neuter"
 
-data class Form( //data class to hold a form
-    val id: Int = 0,
-    val paradigm: String,
-    val slot: String,
-    val form: String
+private val CASE_ABBR4 = listOf("Nom", "Gen", "Dat", "Acc")
+private val CASES4 = listOf("nominative", "genitive", "dative", "accusative")
+private fun num(col: Int) = if (col == 0) "singular" else "plural"
+
+// --- Article & pronouns ----------------------------------------------------
+
+private val pronouns = listOf(
+    gendered(
+        "art", "ὁ, ἡ, τό", "the", "Definite article", Category.PRONOUNS,
+        "No vocative. ὁ, ἡ, οἱ, αἱ have a rough breathing instead of τ and no accent. " +
+            "The genitive plural τῶν is the same in all genders.",
+        M to "ὁ τοῦ τῷ τόν οἱ τῶν τοῖς τούς",
+        F to "ἡ τῆς τῇ τήν αἱ τῶν ταῖς τάς",
+        N to "τό τοῦ τῷ τό τά τῶν τοῖς τά",
+    ),
+    grid(
+        "ego", "ἐγώ", "I, me", "1st person personal pronoun", Category.PRONOUNS,
+        "The unaccented forms μου, μοι, με are enclitic and unemphatic. " +
+            "The plural ἡμ- (we) has a rough breathing; compare ὑμ- (you).",
+        rows = CASE_ABBR4, cols = listOf("Singular", "Plural"),
+        grid = listOf("ἐγώ ἡμεῖς", "ἐμοῦ/μου ἡμῶν", "ἐμοί/μοι ἡμῖν", "ἐμέ/με ἡμᾶς"),
+    ) { r, c -> "${CASES4[r]} ${num(c)}" },
+    grid(
+        "su", "σύ", "you", "2nd person personal pronoun", Category.PRONOUNS,
+        "σου, σοι, σε are the enclitic forms. ἡμεῖς (we) and ὑμεῖς (you) differ only in their first vowel.",
+        rows = CASE_ABBR4, cols = listOf("Singular", "Plural"),
+        grid = listOf("σύ ὑμεῖς", "σοῦ/σου ὑμῶν", "σοί/σοι ὑμῖν", "σέ/σε ὑμᾶς"),
+    ) { r, c -> "${CASES4[r]} ${num(c)}" },
+    gendered(
+        "autos", "αὐτός, αὐτή, αὐτό", "he, she, it; self; same", "3rd person pronoun", Category.PRONOUNS,
+        "Endings of ἀγαθός, but the neuter nom/acc singular is αὐτό with no ν. " +
+            "Smooth breathing: αὐτ-, not the rough-breathing αὑτ- of the reflexive.",
+        M to "αὐτός αὐτοῦ αὐτῷ αὐτόν αὐτοί αὐτῶν αὐτοῖς αὐτούς",
+        F to "αὐτή αὐτῆς αὐτῇ αὐτήν αὐταί αὐτῶν αὐταῖς αὐτάς",
+        N to "αὐτό αὐτοῦ αὐτῷ αὐτό αὐτά αὐτῶν αὐτοῖς αὐτά",
+    ),
+    gendered(
+        "houtos", "οὗτος, αὕτη, τοῦτο", "this, these", "Near demonstrative", Category.PRONOUNS,
+        "Like the article: rough breathing instead of τ in οὗτος, αὕτη, οὗτοι, αὗται. " +
+            "The stem vowel follows the ending: ου with an ο/ω ending, αυ with an α/η ending.",
+        M to "οὗτος τούτου τούτῳ τοῦτον οὗτοι τούτων τούτοις τούτους",
+        F to "αὕτη ταύτης ταύτῃ ταύτην αὗται τούτων ταύταις ταύτας",
+        N to "τοῦτο τούτου τούτῳ τοῦτο ταῦτα τούτων τούτοις ταῦτα",
+    ),
+    gendered(
+        "ekeinos", "ἐκεῖνος, -η, -ο", "that, those", "Far demonstrative", Category.PRONOUNS,
+        "Regular 2-1-2 endings, but neuter nom/acc singular ἐκεῖνο has no ν (like αὐτό).",
+        M to "ἐκεῖνος ἐκείνου ἐκείνῳ ἐκεῖνον ἐκεῖνοι ἐκείνων ἐκείνοις ἐκείνους",
+        F to "ἐκείνη ἐκείνης ἐκείνῃ ἐκείνην ἐκεῖναι ἐκείνων ἐκείναις ἐκείνας",
+        N to "ἐκεῖνο ἐκείνου ἐκείνῳ ἐκεῖνο ἐκεῖνα ἐκείνων ἐκείνοις ἐκεῖνα",
+    ),
+    gendered(
+        "hos", "ὅς, ἥ, ὅ", "who, which", "Relative pronoun", Category.PRONOUNS,
+        "The endings of the article with a rough breathing and an accent. " +
+            "Don't confuse ἥ (who) with the article ἡ, or ὅ (which) with ὁ.",
+        M to "ὅς οὗ ᾧ ὅν οἵ ὧν οἷς οὕς",
+        F to "ἥ ἧς ᾗ ἥν αἵ ὧν αἷς ἅς",
+        N to "ὅ οὗ ᾧ ὅ ἅ ὧν οἷς ἅ",
+    ),
+    gendered(
+        "tis", "τίς, τί", "who? what?", "Interrogative pronoun", Category.PRONOUNS,
+        "3rd declension, stem τιν-. The interrogative always keeps its acute on the first syllable " +
+            "(τίς, τίνος); the indefinite τις, τι (someone) is enclitic.",
+        "Masc./Fem." to "τίς τίνος τίνι τίνα τίνες τίνων τίσι(ν) τίνας",
+        N to "τί τίνος τίνι τί τίνα τίνων τίσι(ν) τίνα",
+    ),
 )
 
-//λόγος (2nd decl.) — nominative singular  (10 forms)
-val logos = listOf(
-    Form(1,  "λόγος (2nd decl.)", "nominative singular", "λόγος"),
-    Form(2,  "λόγος (2nd decl.)", "genitive singular",   "λόγου"),
-    Form(3,  "λόγος (2nd decl.)", "dative singular",     "λόγῳ"),
-    Form(4,  "λόγος (2nd decl.)", "accusative singular", "λόγον"),
-    Form(5,  "λόγος (2nd decl.)", "vocative singular",   "λόγε"),
-    Form(6,  "λόγος (2nd decl.)", "nominative plural",   "λόγοι"),
-    Form(7,  "λόγος (2nd decl.)", "genitive plural",     "λόγων"),
-    Form(8,  "λόγος (2nd decl.)", "dative plural",       "λόγοις"),
-    Form(9,  "λόγος (2nd decl.)", "accusative plural",   "λόγους"),
-    Form(10, "λόγος (2nd decl.)", "vocative plural",     "λόγοι"),
+// --- Nouns -----------------------------------------------------------------
+
+private val nouns = listOf(
+    noun(
+        "arche", "ἀρχή", "beginning", "1st decl. feminine (η)",
+        "η throughout the singular. The 1st declension genitive plural is always -ῶν.",
+        sg = "ἀρχή ἀρχῆς ἀρχῇ ἀρχήν ἀρχή", pl = "ἀρχαί ἀρχῶν ἀρχαῖς ἀρχάς ἀρχαί",
+    ),
+    noun(
+        "hemera", "ἡμέρα", "day", "1st decl. feminine (α pure)",
+        "The stem ends in ε, ι or ρ, so α is kept throughout the singular. " +
+            "Genitive singular ἡμέρας looks like the accusative plural; the article tells them apart.",
+        sg = "ἡμέρα ἡμέρας ἡμέρᾳ ἡμέραν ἡμέρα", pl = "ἡμέραι ἡμερῶν ἡμέραις ἡμέρας ἡμέραι",
+    ),
+    noun(
+        "doxa", "δόξα", "glory", "1st decl. feminine (mixed α/η)",
+        "After a stem not ending in ε, ι or ρ, a short α in the nominative becomes η in the genitive and dative singular.",
+        sg = "δόξα δόξης δόξῃ δόξαν δόξα", pl = "δόξαι δοξῶν δόξαις δόξας δόξαι",
+    ),
+    noun(
+        "prophetes", "προφήτης", "prophet", "1st decl. masculine",
+        "A masculine noun of the 1st declension: nominative -ης and a genitive -ου borrowed from the 2nd declension.",
+        sg = "προφήτης προφήτου προφήτῃ προφήτην προφῆτα",
+        pl = "προφῆται προφητῶν προφήταις προφήτας προφῆται",
+    ),
+    noun(
+        "logos", "λόγος", "word", "2nd decl. masculine",
+        "The model 2nd declension noun. The vocative singular ends in -ε.",
+        sg = "λόγος λόγου λόγῳ λόγον λόγε", pl = "λόγοι λόγων λόγοις λόγους λόγοι",
+    ),
+    noun(
+        "ergon", "ἔργον", "work", "2nd decl. neuter",
+        "The neuter rule: nominative, accusative and vocative are always the same, and the neuter plural ends in -α.",
+        sg = "ἔργον ἔργου ἔργῳ ἔργον ἔργον", pl = "ἔργα ἔργων ἔργοις ἔργα ἔργα",
+    ),
+    noun(
+        "sarx", "σάρξ", "flesh", "3rd decl. (stop stem)",
+        "Stem σαρκ-. Before σ, κ combines to ξ: σάρξ < σαρκ-ς, σαρξί < σαρκ-σι.",
+        sg = "σάρξ σαρκός σαρκί σάρκα σάρξ", pl = "σάρκες σαρκῶν σαρξί(ν) σάρκας σάρκες",
+    ),
+    noun(
+        "pater", "πατήρ", "father", "3rd decl. (syncopated)",
+        "The stem shifts between πατερ- and πατρ-; the dative plural is πατράσι(ν).",
+        sg = "πατήρ πατρός πατρί πατέρα πάτερ", pl = "πατέρες πατέρων πατράσι(ν) πατέρας πατέρες",
+    ),
+    noun(
+        "pneuma", "πνεῦμα", "spirit, wind", "3rd decl. neuter (-ματ-)",
+        "Stem πνευματ-. The τ drops at the end of the word, and before σ in the dative plural.",
+        sg = "πνεῦμα πνεύματος πνεύματι πνεῦμα πνεῦμα",
+        pl = "πνεύματα πνευμάτων πνεύμασι(ν) πνεύματα πνεύματα",
+    ),
+    noun(
+        "polis", "πόλις", "city", "3rd decl. (ι/ε stem)",
+        "The ι of the nominative becomes ε in most forms; genitive singular -εως.",
+        sg = "πόλις πόλεως πόλει πόλιν πόλι", pl = "πόλεις πόλεων πόλεσι(ν) πόλεις πόλεις",
+    ),
+    noun(
+        "basileus", "βασιλεύς", "king", "3rd decl. (ευ stem)",
+        "Stem βασιλευ-/βασιλε-. Genitive -εως, accusative -εα; the nominative and accusative plural are both βασιλεῖς.",
+        sg = "βασιλεύς βασιλέως βασιλεῖ βασιλέα βασιλεῦ",
+        pl = "βασιλεῖς βασιλέων βασιλεῦσι(ν) βασιλεῖς βασιλεῖς",
+    ),
+    noun(
+        "genos", "γένος", "race, kind", "3rd decl. neuter (-ες stem)",
+        "Stem γενεσ-. The σ between vowels drops and the vowels contract: γένεσ-ος > γένεος > γένους.",
+        sg = "γένος γένους γένει γένος γένος", pl = "γένη γενῶν γένεσι(ν) γένη γένη",
+    ),
 )
 
-// ὁ, ἡ, τό — definite article  (24 forms)
-val article = listOf(
-    Form(0, "ὁ, ἡ, τό — definite article", "masculine nominative singular", "ὁ"),
-    Form(1, "ὁ, ἡ, τό — definite article", "masculine genitive singular", "τοῦ"),
-    Form(2, "ὁ, ἡ, τό — definite article", "masculine dative singular", "τῷ"),
-    Form(3, "ὁ, ἡ, τό — definite article", "masculine accusative singular", "τόν"),
-    Form(4, "ὁ, ἡ, τό — definite article", "masculine nominative plural", "οἱ"),
-    Form(5, "ὁ, ἡ, τό — definite article", "masculine genitive plural", "τῶν"),
-    Form(6, "ὁ, ἡ, τό — definite article", "masculine dative plural", "τοῖς"),
-    Form(7, "ὁ, ἡ, τό — definite article", "masculine accusative plural", "τούς"),
-    Form(8, "ὁ, ἡ, τό — definite article", "feminine nominative singular", "ἡ"),
-    Form(9, "ὁ, ἡ, τό — definite article", "feminine genitive singular", "τῆς"),
-    Form(10, "ὁ, ἡ, τό — definite article", "feminine dative singular", "τῇ"),
-    Form(11, "ὁ, ἡ, τό — definite article", "feminine accusative singular", "τήν"),
-    Form(12, "ὁ, ἡ, τό — definite article", "feminine nominative plural", "αἱ"),
-    Form(13, "ὁ, ἡ, τό — definite article", "feminine genitive plural", "τῶν"),
-    Form(14, "ὁ, ἡ, τό — definite article", "feminine dative plural", "ταῖς"),
-    Form(15, "ὁ, ἡ, τό — definite article", "feminine accusative plural", "τάς"),
-    Form(16, "ὁ, ἡ, τό — definite article", "neuter nominative singular", "τό"),
-    Form(17, "ὁ, ἡ, τό — definite article", "neuter genitive singular", "τοῦ"),
-    Form(18, "ὁ, ἡ, τό — definite article", "neuter dative singular", "τῷ"),
-    Form(19, "ὁ, ἡ, τό — definite article", "neuter accusative singular", "τό"),
-    Form(20, "ὁ, ἡ, τό — definite article", "neuter nominative plural", "τά"),
-    Form(21, "ὁ, ἡ, τό — definite article", "neuter genitive plural", "τῶν"),
-    Form(22, "ὁ, ἡ, τό — definite article", "neuter dative plural", "τοῖς"),
-    Form(23, "ὁ, ἡ, τό — definite article", "neuter accusative plural", "τά"),
+// --- Adjectives ------------------------------------------------------------
+
+private val adjectives = listOf(
+    gendered(
+        "agathos", "ἀγαθός, -ή, -όν", "good", "2-1-2 adjective", Category.ADJECTIVES,
+        "Masculine and neuter follow λόγος and ἔργον; the feminine follows ἀρχή.",
+        M to "ἀγαθός ἀγαθοῦ ἀγαθῷ ἀγαθόν ἀγαθοί ἀγαθῶν ἀγαθοῖς ἀγαθούς",
+        F to "ἀγαθή ἀγαθῆς ἀγαθῇ ἀγαθήν ἀγαθαί ἀγαθῶν ἀγαθαῖς ἀγαθάς",
+        N to "ἀγαθόν ἀγαθοῦ ἀγαθῷ ἀγαθόν ἀγαθά ἀγαθῶν ἀγαθοῖς ἀγαθά",
+    ),
+    gendered(
+        "pas", "πᾶς, πᾶσα, πᾶν", "all, every", "3-1-3 adjective", Category.ADJECTIVES,
+        "Stem παντ-. Masculine and neuter are 3rd declension; the feminine πᾶσα is 1st declension.",
+        M to "πᾶς παντός παντί πάντα πάντες πάντων πᾶσι(ν) πάντας",
+        F to "πᾶσα πάσης πάσῃ πᾶσαν πᾶσαι πασῶν πάσαις πάσας",
+        N to "πᾶν παντός παντί πᾶν πάντα πάντων πᾶσι(ν) πάντα",
+    ),
+    gendered(
+        "heis", "εἷς, μία, ἕν", "one", "Numeral", Category.ADJECTIVES,
+        "Singular only. Masculine and neuter share the stem ἑν-; the feminine μία is 1st declension.",
+        M to "εἷς ἑνός ἑνί ἕνα - - - -",
+        F to "μία μιᾶς μιᾷ μίαν - - - -",
+        N to "ἕν ἑνός ἑνί ἕν - - - -",
+    ),
+    gendered(
+        "alethes", "ἀληθής, -ές", "true", "3rd decl. adjective (2-2)", Category.ADJECTIVES,
+        "Masculine and feminine share one set of forms. Stem ἀληθεσ-: the σ drops and the vowels contract (ἀληθέσ-ος > ἀληθοῦς).",
+        "Masc./Fem." to "ἀληθής ἀληθοῦς ἀληθεῖ ἀληθῆ ἀληθεῖς ἀληθῶν ἀληθέσι(ν) ἀληθεῖς",
+        N to "ἀληθές ἀληθοῦς ἀληθεῖ ἀληθές ἀληθῆ ἀληθῶν ἀληθέσι(ν) ἀληθῆ",
+    ),
 )
 
-// ἀρχή — 1st decl. fem. (η)  (7 forms)
-// not attested in the NT: vocative singular, genitive plural, vocative plural
-val arche = listOf(
-    Form(0, "ἀρχή — 1st decl. fem. (η)", "nominative singular", "ἀρχή"),
-    Form(1, "ἀρχή — 1st decl. fem. (η)", "genitive singular", "ἀρχῆς"),
-    Form(2, "ἀρχή — 1st decl. fem. (η)", "dative singular", "ἀρχῇ"),
-    Form(3, "ἀρχή — 1st decl. fem. (η)", "accusative singular", "ἀρχήν"),
-    Form(4, "ἀρχή — 1st decl. fem. (η)", "nominative plural", "ἀρχαί"),
-    Form(5, "ἀρχή — 1st decl. fem. (η)", "dative plural", "ἀρχαῖς"),
-    Form(6, "ἀρχή — 1st decl. fem. (η)", "accusative plural", "ἀρχάς"),
+// --- Verbs: indicative -----------------------------------------------------
+
+private val I = Category.INDICATIVE
+
+private val indicative = listOf(
+    finite(
+        "eimi_pres", "εἰμί", "I am", "Present indicative", I,
+        "Irregular, so it has to be memorised. Every form except εἶ is enclitic in running text.",
+        "εἰμί εἶ ἐστί(ν) ἐσμέν ἐστέ εἰσί(ν)",
+    ),
+    finite(
+        "eimi_impf", "εἰμί", "I was", "Imperfect indicative", I,
+        "1st singular ἤμην has a middle ending; 3rd singular ἦν.",
+        "ἤμην ἦς ἦν ἦμεν ἦτε ἦσαν",
+    ),
+    finite(
+        "eimi_fut", "εἰμί", "I will be", "Future indicative", I,
+        "Middle endings on the stem ἐσ-. 3rd singular ἔσται has no connecting vowel.",
+        "ἔσομαι ἔσῃ ἔσται ἐσόμεθα ἔσεσθε ἔσονται",
+    ),
+    finite(
+        "pres_act", "λύω", "I loose", "Present active indicative", I,
+        "Primary active endings: -ω, -εις, -ει, -ομεν, -ετε, -ουσι(ν).",
+        "λύω λύεις λύει λύομεν λύετε λύουσι(ν)",
+    ),
+    finite(
+        "pres_mp", "λύω", "I am being loosed", "Present middle/passive indicative", I,
+        "Primary middle/passive endings: -μαι, -σαι, -ται, -μεθα, -σθε, -νται. " +
+            "In the 2nd singular the σ drops and ε + αι contracts to ῃ.",
+        "λύομαι λύῃ λύεται λυόμεθα λύεσθε λύονται",
+    ),
+    finite(
+        "impf_act", "λύω", "I was loosing", "Imperfect active indicative", I,
+        "Augment ἐ- + present stem + secondary active endings. The 1st singular and 3rd plural are both ἔλυον.",
+        "ἔλυον ἔλυες ἔλυε(ν) ἐλύομεν ἐλύετε ἔλυον",
+    ),
+    finite(
+        "impf_mp", "λύω", "I was being loosed", "Imperfect middle/passive indicative", I,
+        "Augment + secondary middle/passive endings: -μην, -σο (> ου), -το, -μεθα, -σθε, -ντο.",
+        "ἐλυόμην ἐλύου ἐλύετο ἐλυόμεθα ἐλύεσθε ἐλύοντο",
+    ),
+    finite(
+        "fut_act", "λύω", "I will loose", "Future active indicative", I,
+        "Tense formative σ + the primary active endings of the present.",
+        "λύσω λύσεις λύσει λύσομεν λύσετε λύσουσι(ν)",
+    ),
+    finite(
+        "fut_mid", "λύω", "I will loose (for myself)", "Future middle indicative", I,
+        "σ + primary middle/passive endings.",
+        "λύσομαι λύσῃ λύσεται λυσόμεθα λύσεσθε λύσονται",
+    ),
+    finite(
+        "fut_pass", "λύω", "I will be loosed", "Future passive indicative", I,
+        "The aorist passive stem without augment (λυθη-) + σ + primary middle/passive endings.",
+        "λυθήσομαι λυθήσῃ λυθήσεται λυθησόμεθα λυθήσεσθε λυθήσονται",
+    ),
+    finite(
+        "aor_act", "λύω", "I loosed", "1st aorist active indicative", I,
+        "Augment + stem + σα + secondary endings. The 3rd singular ends in -σε(ν).",
+        "ἔλυσα ἔλυσας ἔλυσε(ν) ἐλύσαμεν ἐλύσατε ἔλυσαν",
+    ),
+    finite(
+        "aor_mid", "λύω", "I loosed (for myself)", "1st aorist middle indicative", I,
+        "Augment + σα + secondary middle endings. The 2nd singular ἐλύσω comes from ἐλύσασο.",
+        "ἐλυσάμην ἐλύσω ἐλύσατο ἐλυσάμεθα ἐλύσασθε ἐλύσαντο",
+    ),
+    finite(
+        "aor_pass", "λύω", "I was loosed", "Aorist passive indicative", I,
+        "Augment + stem + θη + secondary active endings (3rd plural -σαν).",
+        "ἐλύθην ἐλύθης ἐλύθη ἐλύθημεν ἐλύθητε ἐλύθησαν",
+    ),
+    finite(
+        "aor2_act", "λαμβάνω", "I took, received", "2nd aorist active indicative", I,
+        "Second aorist: augment + a changed stem (λαβ-) + the endings of the imperfect.",
+        "ἔλαβον ἔλαβες ἔλαβε(ν) ἐλάβομεν ἐλάβετε ἔλαβον",
+    ),
+    finite(
+        "perf_act", "λύω", "I have loosed", "Perfect active indicative", I,
+        "Reduplication (λε-) + stem + κα. The 3rd plural is also found as λέλυκαν.",
+        "λέλυκα λέλυκας λέλυκε(ν) λελύκαμεν λελύκατε λελύκασι(ν)/λέλυκαν",
+    ),
+    finite(
+        "perf_mp", "λύω", "I have been loosed", "Perfect middle/passive indicative", I,
+        "Reduplication, no tense formative and no connecting vowel: the endings sit directly on the stem.",
+        "λέλυμαι λέλυσαι λέλυται λελύμεθα λέλυσθε λέλυνται",
+    ),
+    finite(
+        "agapao", "ἀγαπάω", "I love", "Contract verb (α): present active", I,
+        "α + ε > α, α + ο/ω > ω, and ι becomes subscript: ἀγαπάεις > ἀγαπᾷς.",
+        "ἀγαπῶ ἀγαπᾷς ἀγαπᾷ ἀγαπῶμεν ἀγαπᾶτε ἀγαπῶσι(ν)",
+    ),
+    finite(
+        "poieo", "ποιέω", "I do, make", "Contract verb (ε): present active", I,
+        "ε + ε > ει, ε + ο > ου, ε + ω > ω, ε + ει > ει, ε + ου > ου.",
+        "ποιῶ ποιεῖς ποιεῖ ποιοῦμεν ποιεῖτε ποιοῦσι(ν)",
+    ),
+    finite(
+        "plerooo", "πληρόω", "I fill, fulfil", "Contract verb (ο): present active", I,
+        "ο + ε/ο/ου > ου, ο + ω > ω, and any ο + ι combination > οι.",
+        "πληρῶ πληροῖς πληροῖ πληροῦμεν πληροῦτε πληροῦσι(ν)",
+    ),
+    finite(
+        "didomi", "δίδωμι", "I give", "μι verb: present active", I,
+        "Reduplicated stem διδω-/διδο- with the μι endings -μι, -ς, -σι(ν), -μεν, -τε, -ασι(ν).",
+        "δίδωμι δίδως δίδωσι(ν) δίδομεν δίδοτε διδόασι(ν)",
+    ),
 )
 
-// ἡμέρα — 1st decl. fem. (α)  (8 forms)
+// --- Verbs: subjunctive, imperative, infinitive ---------------------------
 
-val hemera = listOf(
-    Form(0, "ἡμέρα — 1st decl. fem. (α)", "nominative singular", "ἡμέρα"),
-    Form(1, "ἡμέρα — 1st decl. fem. (α)", "genitive singular", "ἡμέρας"),
-    Form(2, "ἡμέρα — 1st decl. fem. (α)", "dative singular", "ἡμέρᾳ"),
-    Form(3, "ἡμέρα — 1st decl. fem. (α)", "accusative singular", "ἡμέραν"),
-    Form(4, "ἡμέρα — 1st decl. fem. (α)", "nominative plural", "ἡμέραι"),
-    Form(5, "ἡμέρα — 1st decl. fem. (α)", "genitive plural", "ἡμερῶν"),
-    Form(6, "ἡμέρα — 1st decl. fem. (α)", "dative plural", "ἡμέραις"),
-    Form(7, "ἡμέρα — 1st decl. fem. (α)", "accusative plural", "ἡμέρας"),
+private val NI = Category.NON_INDICATIVE
+
+private val nonIndicative = listOf(
+    finite(
+        "pres_subj", "λύω", "(that) I may loose", "Present active subjunctive", NI,
+        "The connecting vowel lengthens (ο > ω, ε > η), and ι becomes subscript: λύῃς, λύῃ.",
+        "λύω λύῃς λύῃ λύωμεν λύητε λύωσι(ν)",
+    ),
+    finite(
+        "aor_subj", "λύω", "(that) I may loose", "Aorist active subjunctive", NI,
+        "No augment (that belongs to the indicative only). Aorist stem λυσ- + the endings of the present subjunctive.",
+        "λύσω λύσῃς λύσῃ λύσωμεν λύσητε λύσωσι(ν)",
+    ),
+    finite(
+        "aor_pass_subj", "λύω", "(that) I may be loosed", "Aorist passive subjunctive", NI,
+        "Unaugmented λυθ- + the lengthened vowel endings, all with a circumflex on the ending.",
+        "λυθῶ λυθῇς λυθῇ λυθῶμεν λυθῆτε λυθῶσι(ν)",
+    ),
+    finite(
+        "eimi_subj", "εἰμί", "(that) I may be", "Present subjunctive", NI,
+        "The bare subjunctive endings with a rough breathing and a circumflex. These are also the endings of λυθῶ.",
+        "ὦ ᾖς ᾖ ὦμεν ἦτε ὦσι(ν)",
+    ),
+    imperative(
+        "pres_impv", "λύω", "loose!", "Present active imperative",
+        "2nd singular -ε, 3rd -έτω / -έτωσαν. The 2nd plural λύετε is the same as the indicative.",
+        "λῦε λυέτω λύετε λυέτωσαν",
+    ),
+    imperative(
+        "aor_impv", "λύω", "loose!", "Aorist active imperative",
+        "No augment. 2nd singular -σον, and the rest keep the σα of the aorist.",
+        "λῦσον λυσάτω λύσατε λυσάτωσαν",
+    ),
+    grid(
+        "inf", "λύω", "to loose", "Infinitives", NI,
+        "Infinitives have tense and voice but no person or number. The present middle and passive share one form, λύεσθαι.",
+        rows = listOf("Present", "Aorist", "Perfect"),
+        cols = listOf("Active", "Middle", "Passive"),
+        grid = listOf(
+            "λύειν λύεσθαι λύεσθαι",
+            "λῦσαι λύσασθαι λυθῆναι",
+            "λελυκέναι λελύσθαι λελύσθαι",
+        ),
+    ) { r, c ->
+        "${listOf("present", "aorist", "perfect")[r]} ${listOf("active", "middle", "passive")[c]} infinitive"
+    },
 )
 
-// ἔργον — 2nd decl. neut.  (8 forms)
+// --- Participles -----------------------------------------------------------
 
-val ergon = listOf(
-    Form(0, "ἔργον — 2nd decl. neut.", "nominative singular", "ἔργον"),
-    Form(1, "ἔργον — 2nd decl. neut.", "genitive singular", "ἔργου"),
-    Form(2, "ἔργον — 2nd decl. neut.", "dative singular", "ἔργῳ"),
-    Form(3, "ἔργον — 2nd decl. neut.", "accusative singular", "ἔργον"),
-    Form(4, "ἔργον — 2nd decl. neut.", "nominative plural", "ἔργα"),
-    Form(5, "ἔργον — 2nd decl. neut.", "genitive plural", "ἔργων"),
-    Form(6, "ἔργον — 2nd decl. neut.", "dative plural", "ἔργοις"),
-    Form(7, "ἔργον — 2nd decl. neut.", "accusative plural", "ἔργα"),
+private val P = Category.PARTICIPLES
+
+private val participles = listOf(
+    gendered(
+        "ptc_pres_act", "λύων, λύουσα, λῦον", "loosing", "Present active participle", P,
+        "Masc./neut. 3rd declension on the stem λυοντ-; feminine 1st declension on λυουσ-. " +
+            "The dative plural λύουσι(ν) looks like the 3rd plural indicative.",
+        M to "λύων λύοντος λύοντι λύοντα λύοντες λυόντων λύουσι(ν) λύοντας",
+        F to "λύουσα λυούσης λυούσῃ λύουσαν λύουσαι λυουσῶν λυούσαις λυούσας",
+        N to "λῦον λύοντος λύοντι λῦον λύοντα λυόντων λύουσι(ν) λύοντα",
+    ),
+    gendered(
+        "ptc_pres_mp", "λυόμενος, -η, -ον", "being loosed", "Present middle/passive participle", P,
+        "The participle morpheme μεν + the endings of ἀγαθός. The accent stays on the ο of λυό-.",
+        M to "λυόμενος λυομένου λυομένῳ λυόμενον λυόμενοι λυομένων λυομένοις λυομένους",
+        F to "λυομένη λυομένης λυομένῃ λυομένην λυόμεναι λυομένων λυομέναις λυομένας",
+        N to "λυόμενον λυομένου λυομένῳ λυόμενον λυόμενα λυομένων λυομένοις λυόμενα",
+    ),
+    gendered(
+        "ptc_aor_act", "λύσας, λύσασα, λῦσαν", "having loosed", "Aorist active participle", P,
+        "No augment. Stem λυσαντ- for masc./neut. and λυσασ- for the feminine.",
+        M to "λύσας λύσαντος λύσαντι λύσαντα λύσαντες λυσάντων λύσασι(ν) λύσαντας",
+        F to "λύσασα λυσάσης λυσάσῃ λύσασαν λύσασαι λυσασῶν λυσάσαις λυσάσας",
+        N to "λῦσαν λύσαντος λύσαντι λῦσαν λύσαντα λυσάντων λύσασι(ν) λύσαντα",
+    ),
+    gendered(
+        "ptc_aor_pass", "λυθείς, λυθεῖσα, λυθέν", "having been loosed", "Aorist passive participle", P,
+        "Stem λυθεντ- for masc./neut. and λυθεισ- for the feminine. The accent stays on the θε syllable.",
+        M to "λυθείς λυθέντος λυθέντι λυθέντα λυθέντες λυθέντων λυθεῖσι(ν) λυθέντας",
+        F to "λυθεῖσα λυθείσης λυθείσῃ λυθεῖσαν λυθεῖσαι λυθεισῶν λυθείσαις λυθείσας",
+        N to "λυθέν λυθέντος λυθέντι λυθέν λυθέντα λυθέντων λυθεῖσι(ν) λυθέντα",
+    ),
 )
 
-// πατήρ — 3rd decl.  (10 forms)
-val pater = listOf(
-    Form(0, "πατήρ — 3rd decl.", "nominative singular", "πατήρ"),
-    Form(1, "πατήρ — 3rd decl.", "genitive singular", "πατρός"),
-    Form(2, "πατήρ — 3rd decl.", "dative singular", "πατρί"),
-    Form(3, "πατήρ — 3rd decl.", "accusative singular", "πατέρα"),
-    Form(4, "πατήρ — 3rd decl.", "vocative singular", "πάτερ"),
-    Form(5, "πατήρ — 3rd decl.", "nominative plural", "πατέρες"),
-    Form(6, "πατήρ — 3rd decl.", "genitive plural", "πατέρων"),
-    Form(7, "πατήρ — 3rd decl.", "dative plural", "πατράσι(ν)"),
-    Form(8, "πατήρ — 3rd decl.", "accusative plural", "πατέρας"),
-    Form(9, "πατήρ — 3rd decl.", "vocative plural", "πατέρες"),
-)
+/** Every paradigm in the app, in display order. */
+val paradigms: List<Paradigm> by lazy { pronouns + nouns + adjectives + indicative + nonIndicative + participles }
 
-// πνεῦμα — 3rd decl. neut.  (8 forms)
+/** Fast lookup tables. */
+val paradigmById: Map<String, Paradigm> by lazy { paradigms.associateBy { it.id } }
+val formById: Map<String, Form> by lazy { paradigms.flatMap { it.forms }.associateBy { it.id } }
 
-val pneuma = listOf(
-    Form(0, "πνεῦμα — 3rd decl. neut.", "nominative singular", "πνεῦμα"),
-    Form(1, "πνεῦμα — 3rd decl. neut.", "genitive singular", "πνεύματος"),
-    Form(2, "πνεῦμα — 3rd decl. neut.", "dative singular", "πνεύματι"),
-    Form(3, "πνεῦμα — 3rd decl. neut.", "accusative singular", "πνεῦμα"),
-    Form(4, "πνεῦμα — 3rd decl. neut.", "nominative plural", "πνεύματα"),
-    Form(5, "πνεῦμα — 3rd decl. neut.", "genitive plural", "πνευμάτων"),
-    Form(6, "πνεῦμα — 3rd decl. neut.", "dative plural", "πνεύμασι(ν)"),
-    Form(7, "πνεῦμα — 3rd decl. neut.", "accusative plural", "πνεύματα"),
-)
-
-// εἰμί — present indicative  (6 forms)
-val eimi = listOf(
-    Form(0, "εἰμί — present indicative", "1st person singular", "εἰμί"),
-    Form(1, "εἰμί — present indicative", "2nd person singular", "εἶ"),
-    Form(2, "εἰμί — present indicative", "3rd person singular", "ἐστί(ν)"),
-    Form(3, "εἰμί — present indicative", "1st person plural", "ἐσμέν"),
-    Form(4, "εἰμί — present indicative", "2nd person plural", "ἐστέ"),
-    Form(5, "εἰμί — present indicative", "3rd person plural", "εἰσί(ν)"),
-)
-
-// πιστεύω — pres. act. indic.  (6 forms)
-val pisteuo = listOf(
-    Form(0, "πιστεύω — pres. act. indic.", "1st person singular", "πιστεύω"),
-    Form(1, "πιστεύω — pres. act. indic.", "2nd person singular", "πιστεύεις"),
-    Form(2, "πιστεύω — pres. act. indic.", "3rd person singular", "πιστεύει"),
-    Form(3, "πιστεύω — pres. act. indic.", "1st person plural", "πιστεύομεν"),
-    Form(4, "πιστεύω — pres. act. indic.", "2nd person plural", "πιστεύετε"),
-    Form(5, "πιστεύω — pres. act. indic.", "3rd person plural", "πιστεύουσι(ν)"),
-)
-
-data class Deck(val name: String, val forms: List<Form>)
-
-val decks = listOf(
-    Deck("ὁ, ἡ, τό — definite article", article),
-    Deck("λόγος — 2nd decl. masc.", logos),
-    Deck("ἀρχή — 1st decl. fem. (η)", arche),
-    Deck("ἡμέρα — 1st decl. fem. (α)", hemera),
-    Deck("ἔργον — 2nd decl. neut.", ergon),
-    Deck("πατήρ — 3rd decl.", pater),
-    Deck("πνεῦμα — 3rd decl. neut.", pneuma),
-    Deck("εἰμί — present indicative", eimi),
-    Deck("πιστεύω — pres. act. indic.", pisteuo),
-)
+/** Matches lemma, title or gloss, with or without accents, in Greek or Latin letters. */
+fun search(query: String): List<Paradigm> {
+    val q = query.trim().lowercase()
+    if (q.isEmpty()) return paradigms
+    val bareQ = GreekText.bare(q)
+    return paradigms.filter { p ->
+        val hay = listOf(p.lemma, p.title, p.gloss, p.category.title)
+        hay.any { it.lowercase().contains(q) || GreekText.bare(it).contains(bareQ) } ||
+            GreekText.transliterate(p.lemma).contains(q) ||
+            p.forms.any { f -> f.answers.any { GreekText.bare(it).startsWith(bareQ) } }
+    }
+}
