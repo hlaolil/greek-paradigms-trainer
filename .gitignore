@@ -13,3 +13,7 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Release signing key and its passwords: never commit
+/release.jks
+/keystore.properties
