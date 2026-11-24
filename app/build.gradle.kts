@@ -1,16 +1,24 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
 
+/** Release signing details from keystore.properties (git-ignored); empty if the file is absent. */
+val releaseKeystore = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
 android {
-    namespace = "com.example.greekparadigms"
+    namespace = "io.github.hlaolil.greekparadigms"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.example.greekparadigms"
+        applicationId = "io.github.hlaolil.greekparadigms"
         minSdk = 24
         targetSdk = 37
         versionCode = 2
@@ -19,8 +27,29 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        // One debug key shared by every machine, committed with the project, so a build
+        // from any computer installs over the last one without "signatures do not match".
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+        // The release key lives outside version control; see keystore.properties.
+        if (releaseKeystore.isNotEmpty()) {
+            create("release") {
+                storeFile = rootProject.file(releaseKeystore.getProperty("storeFile"))
+                storePassword = releaseKeystore.getProperty("storePassword")
+                keyAlias = releaseKeystore.getProperty("keyAlias")
+                keyPassword = releaseKeystore.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (releaseKeystore.isNotEmpty()) signingConfig = signingConfigs.getByName("release")
             optimization {
                 enable = false
             }

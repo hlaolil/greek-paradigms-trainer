@@ -32,7 +32,12 @@ My purpose was to understand three things I had never worked with: how a declara
 * `AppState.kt`: the single source of truth and back stack. It persists progress to SharedPreferences.
 * `*Screen.kt`, `GreekKeyboard.kt`, `Components.kt`: stateless Compose screens that receive data and callbacks only.
 
-Run the tests with `./gradlew test`.
+Run the unit tests with `./gradlew test`, and the UI tests on a connected phone or emulator with `./gradlew connectedDebugAndroidTest`.
+
+# Signing
+
+* **Debug builds** use `app/debug.keystore`, which is committed, so a build from any computer installs over the previous one.
+* **Release builds** are signed with `release.jks`, configured in `keystore.properties` at the project root. Both files are git-ignored. Back them up somewhere safe, because the Play Store accepts updates only when they are signed with the same key. Without `keystore.properties`, the release build is unsigned.
 
 # Development Environment
 
