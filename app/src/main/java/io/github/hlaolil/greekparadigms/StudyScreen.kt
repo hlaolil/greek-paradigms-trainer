@@ -2,6 +2,7 @@ package io.github.hlaolil.greekparadigms
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -29,6 +31,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,12 +56,15 @@ import kotlin.random.Random
 @Composable
 fun StudyScreen(
     session: Session,
-    settings: Settings,
-    onUpdate: (Session) -> Unit,
-    onRecord: (Form, Boolean) -> Unit,
+    progress: Progress,
+    today: Long,
+    newAchievements: List<Achievement>,
+    onAnswer: (correct: Boolean, asked: StudyMode) -> Unit,
+    onFinish: () -> Unit,
     onRestart: (List<Form>, StudyMode) -> Unit,
     onExit: () -> Unit,
 ) {
+    val nt = LocalNt.current
     Column(Modifier.fillMaxSize()) {
         AppBar("${session.mode.title} · ${session.title}", onBack = onExit)
         val fraction = if (session.queue.isEmpty()) 1f else session.position.toFloat() / session.queue.size
@@ -66,29 +72,74 @@ fun StudyScreen(
 
         val form = session.current
         if (form == null) {
-            Results(session, onRestart, onExit)
+            LaunchedEffect(session.rewarded) { onFinish() }
+            Results(session, progress, today, newAchievements, onRestart, onExit)
             return@Column
         }
 
+        val key = "${session.position}-${form.id}"
+        // Chosen once per card, so it doesn't change when the answer is recorded.
+        val asked = remember(key) { session.cardMode(progress.state(form.id), nt.hasExamples(form.id)) }
+        val example = remember(key) { nt.exampleFor(form.id, session.seed + session.position) }
+        val random = Random(session.seed + session.position)
+
+        StatusRow(session, asked)
+        val answer: (Boolean) -> Unit = { correct -> onAnswer(correct, asked) }
+        when (asked) {
+            StudyMode.FLASHCARD -> FlashcardCard(key, form, example, answer)
+            StudyMode.TYPE -> TypeCard(key, form, example, progress.settings.requireAccents, answer)
+            StudyMode.CHOOSE -> ChooseFormCard(key, form, example, random, answer)
+            StudyMode.PARSE -> ParseCard(key, form, example, random, answer)
+            StudyMode.CONTEXT, StudyMode.SMART ->
+                if (example != null) ContextCard(key, form, example, random, answer)
+                else ParseCard(key, form, null, random, answer)
+        }
+    }
+}
+
+/** Score, the current combo and XP earned so far, and in a smart lesson how this card is asked. */
+@Composable
+private fun StatusRow(session: Session, asked: StudyMode) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(
-            "${session.correct} correct · ${session.answered} of ${session.total} answered",
+            buildString {
+                append("${session.correct} correct · ${session.answered} of ${session.total}")
+                if (session.mode == StudyMode.SMART) append(" · ${asked.title}")
+            },
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.weight(1f),
         )
+        AnimatedVisibility(session.combo >= 3, enter = fadeIn() + scaleIn()) {
+            Badge(
+                "🔥 ${session.combo} in a row",
+                MaterialTheme.colorScheme.secondaryContainer,
+                MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Badge("${session.xp} XP", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
+    }
+}
 
-        // A fresh card state each time the position moves on.
-        val answer: (Boolean) -> Unit = { correct ->
-            if (session.isFirstAttempt) onRecord(form, correct)
-            onUpdate(session.answer(correct))
-        }
-        val key = "${session.position}-${form.id}"
-        when (session.mode) {
-            StudyMode.FLASHCARD -> FlashcardCard(key, form, answer)
-            StudyMode.TYPE -> TypeCard(key, form, settings.requireAccents, answer)
-            StudyMode.CHOOSE -> ChooseFormCard(key, form, Random(session.seed + session.position), answer)
-            StudyMode.PARSE -> ParseCard(key, form, Random(session.seed + session.position), answer)
-        }
+/** The NT example for a form, once its answer is showing. */
+@Composable
+private fun ExampleAfterAnswer(form: Form, example: NtExample?) {
+    val nt = LocalNt.current
+    Spacer(Modifier.height(16.dp))
+    if (example != null) {
+        NtExampleCard(example, nt.frequency(form.id))
+    } else if (!nt.isEmpty) {
+        Text(
+            "This form doesn't occur in the New Testament.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
@@ -144,7 +195,7 @@ private fun CardColumn(content: @Composable () -> Unit) {
 // --- Flashcards -------------------------------------------------------------
 
 @Composable
-private fun FlashcardCard(key: String, form: Form, onAnswer: (Boolean) -> Unit) {
+private fun FlashcardCard(key: String, form: Form, example: NtExample?, onAnswer: (Boolean) -> Unit) {
     var revealed by rememberSaveable(key) { mutableStateOf(false) }
     CardColumn {
         Context(form)
@@ -160,7 +211,8 @@ private fun FlashcardCard(key: String, form: Form, onAnswer: (Boolean) -> Unit) 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(form.display, style = GreekCardStyle, textAlign = TextAlign.Center)
                 AlsoParses(form)
-                Spacer(Modifier.height(40.dp))
+                ExampleAfterAnswer(form, example)
+                Spacer(Modifier.height(24.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                     OutlinedButton(
                         onClick = { onAnswer(false) },
@@ -179,7 +231,7 @@ private fun FlashcardCard(key: String, form: Form, onAnswer: (Boolean) -> Unit) 
 // --- Typing -------------------------------------------------------------------
 
 @Composable
-private fun TypeCard(key: String, form: Form, requireAccents: Boolean, onAnswer: (Boolean) -> Unit) {
+private fun TypeCard(key: String, form: Form, example: NtExample?, requireAccents: Boolean, onAnswer: (Boolean) -> Unit) {
     var typed by rememberSaveable(key) { mutableStateOf("") }
     var verdict by rememberSaveable(key) { mutableStateOf<GreekText.Verdict?>(null) }
     var gaveUp by rememberSaveable(key) { mutableStateOf(false) }
@@ -218,6 +270,7 @@ private fun TypeCard(key: String, form: Form, requireAccents: Boolean, onAnswer:
                 val v = verdict
                 if (v != null) {
                     Feedback(v, form)
+                    ExampleAfterAnswer(form, example)
                     Spacer(Modifier.height(16.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                         // Lets the learner overrule the checker, but only for an answer they actually gave.
@@ -297,7 +350,7 @@ private fun Feedback(verdict: GreekText.Verdict, form: Form) {
 // --- Multiple choice ----------------------------------------------------------
 
 @Composable
-private fun ChooseFormCard(key: String, form: Form, random: Random, onAnswer: (Boolean) -> Unit) {
+private fun ChooseFormCard(key: String, form: Form, example: NtExample?, random: Random, onAnswer: (Boolean) -> Unit) {
     val options = remember(key) { Choices.forms(form, random) }
     var picked by rememberSaveable(key) { mutableStateOf<Int?>(null) }
     val correctIndex = options.indexOf(form.display)
@@ -308,12 +361,12 @@ private fun ChooseFormCard(key: String, form: Form, random: Random, onAnswer: (B
         options.forEachIndexed { i, option ->
             OptionButton(option, i, picked, correctIndex, greek = true) { if (picked == null) picked = i }
         }
-        ContinueAfterPick(picked, correctIndex, form, onAnswer)
+        ContinueAfterPick(picked, correctIndex, form, onAnswer) { ExampleAfterAnswer(form, example) }
     }
 }
 
 @Composable
-private fun ParseCard(key: String, form: Form, random: Random, onAnswer: (Boolean) -> Unit) {
+private fun ParseCard(key: String, form: Form, example: NtExample?, random: Random, onAnswer: (Boolean) -> Unit) {
     val options = remember(key) { Choices.parses(form, random) }
     var picked by rememberSaveable(key) { mutableStateOf<Int?>(null) }
     val correctIndex = options.indexOfFirst { it.id == form.id }
@@ -324,7 +377,65 @@ private fun ParseCard(key: String, form: Form, random: Random, onAnswer: (Boolea
         options.forEachIndexed { i, option ->
             OptionButton(option.parse, i, picked, correctIndex, greek = false) { if (picked == null) picked = i }
         }
-        ContinueAfterPick(picked, correctIndex, form, onAnswer)
+        ContinueAfterPick(picked, correctIndex, form, onAnswer) { ExampleAfterAnswer(form, example) }
+    }
+}
+
+/**
+ * Parsing in context: a real NT phrase with one word picked out. The options give
+ * tense and voice as well as person, number and case, so the verse has to be read.
+ */
+@Composable
+private fun ContextCard(key: String, form: Form, example: NtExample, random: Random, onAnswer: (Boolean) -> Unit) {
+    val options = remember(key) { Choices.contextParses(form, random) }
+    var picked by rememberSaveable(key) { mutableStateOf<Int?>(null) }
+    val correctIndex = options.indexOfFirst { it.id == form.id }
+    val mixed = options.any { it.paradigmId != form.paradigmId }
+    val nt = LocalNt.current
+    CardColumn {
+        Text(
+            "Parse the highlighted word",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.secondary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(16.dp))
+        NtPhrase(example, Modifier.fillMaxWidth(), fontSize = 24.sp)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            example.reference + if (example.exact) "" else " · ${example.lemma}, which follows the pattern of λύω",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(16.dp))
+        options.forEachIndexed { i, option ->
+            OptionButton(Choices.label(option, mixed), i, picked, correctIndex, greek = false) { if (picked == null) picked = i }
+        }
+        ContinueAfterPick(picked, correctIndex, form, onAnswer) {
+            val p = paradigmById.getValue(form.paradigmId)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "${example.word.trimEnd(',', '.', ';', '·', ':')} = ${p.title.lowercase()}, ${form.parse}" +
+                    if (example.exact) "" else " (like ${form.display})",
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            val freq = nt.frequency(form.id)
+            if (freq.exact + freq.pattern > 0) {
+                Text(
+                    if (freq.exact > 0) "${form.display} occurs ${timesInNt(freq.exact)} in the NT"
+                    else "This pattern occurs ${timesInNt(freq.pattern)} in the NT",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
     }
 }
 
@@ -357,11 +468,18 @@ private fun OptionButton(text: String, index: Int, picked: Int?, correctIndex: I
 }
 
 @Composable
-private fun ContinueAfterPick(picked: Int?, correctIndex: Int, form: Form, onAnswer: (Boolean) -> Unit) {
+private fun ContinueAfterPick(
+    picked: Int?,
+    correctIndex: Int,
+    form: Form,
+    onAnswer: (Boolean) -> Unit,
+    after: @Composable () -> Unit = {},
+) {
     if (picked == null) return
     val right = picked == correctIndex
     Spacer(Modifier.height(8.dp))
     AlsoParses(form)
+    after()
     Spacer(Modifier.height(16.dp))
     Button(onClick = { onAnswer(right) }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
         Text(if (right) "Correct · Continue" else "Continue")
@@ -371,21 +489,64 @@ private fun ContinueAfterPick(picked: Int?, correctIndex: Int, form: Form, onAns
 // --- Results ------------------------------------------------------------------
 
 @Composable
-private fun Results(session: Session, onRestart: (List<Form>, StudyMode) -> Unit, onExit: () -> Unit) {
+private fun Results(
+    session: Session,
+    progress: Progress,
+    today: Long,
+    newAchievements: List<Achievement>,
+    onRestart: (List<Form>, StudyMode) -> Unit,
+    onExit: () -> Unit,
+) {
     val pct = if (session.total == 0) 0 else (100 * session.correct / session.total)
     val missed = session.missed
     val all = session.queue.distinct().mapNotNull { formById[it] }
     CardColumn {
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(16.dp))
+        Text(
+            if (session.perfect) "Flawless!" else "Lesson complete",
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.secondary,
+        )
         Text("$pct%", style = MaterialTheme.typography.displayLarge, color = MaterialTheme.colorScheme.primary)
         Text(
             "${session.correct} of ${session.total} right first time",
             style = MaterialTheme.typography.titleMedium,
         )
+        Spacer(Modifier.height(16.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
+            Stat("+${session.xp + session.completionBonus}", "XP earned")
+            Stat("${session.bestCombo}", "best combo")
+            Stat("🔥 ${progress.streak(today)}", "day streak")
+        }
         Spacer(Modifier.height(8.dp))
+        val goal = progress.settings.dailyGoal
+        val xpToday = progress.xpOn(today)
+        Text(
+            if (xpToday >= goal) "Daily goal reached: $xpToday / $goal XP" else "Daily goal: $xpToday / $goal XP",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(4.dp))
+        ProgressBar(xpToday.toFloat() / goal.coerceAtLeast(1), color = MaterialTheme.colorScheme.tertiary)
+
+        newAchievements.forEach { a ->
+            Spacer(Modifier.height(12.dp))
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("🏆 Achievement unlocked", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                    Text(a.title, style = MaterialTheme.typography.titleLarge)
+                    Text(a.detail, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
         Text(
             when {
-                pct == 100 -> "Flawless. These forms will come back in a few days to make sure they stick."
+                pct == 100 -> "These forms will come back in a few days to make sure they stick."
                 pct >= 80 -> "Strong work. The misses below will come round again soon."
                 pct >= 50 -> "Getting there. Go over the misses once more while they're fresh."
                 else -> "A hard set. Look at the paradigm table, then try the misses again."
@@ -436,7 +597,7 @@ fun StudyScreenPreview() {
     GreekParadigmsTheme {
         StudyScreen(
             Session.start("λόγος", StudyMode.FLASHCARD, paradigmById.getValue("logos").forms, shuffle = false),
-            Settings(), {}, { _, _ -> }, { _, _ -> }, {},
+            Progress(), 0, emptyList(), { _, _ -> }, {}, { _, _ -> }, {},
         )
     }
 }

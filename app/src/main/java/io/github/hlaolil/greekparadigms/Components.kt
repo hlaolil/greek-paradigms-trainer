@@ -9,7 +9,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -19,16 +22,25 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.hlaolil.greekparadigms.ui.theme.GreekFamily
 import io.github.hlaolil.greekparadigms.ui.theme.LocalExtraColors
+import kotlin.math.roundToInt
 
 /** Top bar with an optional back button and trailing actions. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -141,3 +153,87 @@ fun Readable(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
 }
 
 val SpacedBy8 = Arrangement.spacedBy(8.dp)
+
+/** Five pips showing a paradigm's level (0–5). */
+@Composable
+fun LevelDots(level: Int, modifier: Modifier = Modifier) {
+    val on = MaterialTheme.colorScheme.tertiary
+    val off = MaterialTheme.colorScheme.surfaceContainerHighest
+    Row(
+        modifier.semantics { contentDescription = "Level $level of 5" },
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        repeat(5) { i ->
+            Box(Modifier.size(8.dp).clip(CircleShape).background(if (i < level) on else off))
+        }
+    }
+}
+
+/** Memory strength as a percentage with a colour that warms as it fades. */
+@Composable
+fun strengthColor(strength: Double): Color {
+    val extra = LocalExtraColors.current
+    return when {
+        strength >= 0.9 -> extra.mastered
+        strength >= CardState.FADING -> extra.learning
+        else -> MaterialTheme.colorScheme.error
+    }
+}
+
+fun percent(x: Double) = "${(x * 100).roundToInt()}%"
+
+/** A New Testament phrase with the form picked out. */
+@Composable
+fun NtPhrase(example: NtExample, modifier: Modifier = Modifier, fontSize: TextUnit = 20.sp, hideWord: Boolean = false) {
+    val highlight = MaterialTheme.colorScheme.secondary
+    val text = buildAnnotatedString {
+        if (example.before.isNotEmpty()) append(example.before + " ")
+        withStyle(SpanStyle(color = highlight, fontWeight = FontWeight.Bold)) {
+            append(if (hideWord) "_____" else example.word)
+        }
+        if (example.after.isNotEmpty()) append(" " + example.after)
+    }
+    Text(
+        text,
+        fontFamily = GreekFamily,
+        fontSize = fontSize,
+        lineHeight = fontSize * 1.4f,
+        textAlign = TextAlign.Center,
+        modifier = modifier,
+    )
+}
+
+/** An NT example with its reference, and for pattern examples the verb it comes from. */
+@Composable
+fun NtExampleCard(example: NtExample, frequency: NtFrequency?, modifier: Modifier = Modifier) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = RoundedCornerShape(12.dp),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                if (example.exact) "IN THE NEW TESTAMENT" else "SAME PATTERN IN THE NEW TESTAMENT",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+            Spacer(Modifier.height(6.dp))
+            NtPhrase(example, fontSize = 18.sp)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                buildString {
+                    append(example.reference)
+                    if (!example.exact) append(" · from ${example.lemma}")
+                    if (frequency != null && frequency.exact > 0) append(" · this form ${timesInNt(frequency.exact)} in the NT")
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+/** Gives screens access to the NT corpus without threading it through every call. */
+val LocalNt = staticCompositionLocalOf { NtCorpus.EMPTY }

@@ -34,12 +34,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.width
 import androidx.compose.ui.unit.dp
 import io.github.hlaolil.greekparadigms.ui.theme.LocalExtraColors
 import kotlin.math.roundToInt
 
 @Composable
-fun StatsScreen(progress: Progress, today: Long, onBack: () -> Unit) {
+fun StatsScreen(progress: Progress, today: Long, onBack: () -> Unit, onStrengthen: (List<Form>) -> Unit = {}) {
     val all = paradigms.flatMap { it.forms }
     val mastered = progress.masteredCount(all)
     val seen = progress.seenCount(all)
@@ -59,14 +61,71 @@ fun StatsScreen(progress: Progress, today: Long, onBack: () -> Unit) {
                         Stat("${all.size}", "total forms")
                     }
                     Row(Modifier.fillMaxWidth().padding(bottom = 20.dp), horizontalArrangement = Arrangement.SpaceAround) {
-                        Stat("${progress.streak(today)}", "day streak")
+                        Stat("🔥 ${progress.streak(today)}", "day streak")
+                        Stat("${progress.bestStreak()}", "best streak")
                         Stat("${(progress.accuracy * 100).roundToInt()}%", "accuracy")
+                    }
+                    Row(Modifier.fillMaxWidth().padding(bottom = 20.dp), horizontalArrangement = Arrangement.SpaceAround) {
+                        Stat("%,d".format(progress.xp), "total XP")
                         Stat("$reps", "answers")
+                        Stat(progress.strength(all, today)?.let { percent(it) } ?: "–", "memory")
                     }
                 }
 
                 SectionHeader("Last 16 weeks")
-                ActivityGrid(progress.studyDays, today)
+                ActivityGrid(progress.studyDays, progress.frozenDays, today)
+                if (progress.frozenDays.isNotEmpty() || progress.freezes > 0) {
+                    Text(
+                        "❄️ Pale squares are days a streak freeze covered. You have ${progress.freezes} in hand; " +
+                            "you earn one for every 7 days of streak (up to ${Progress.MAX_FREEZES}).",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+
+                val fading = progress.fadingForms(today)
+                SectionHeader("Memory")
+                Text(
+                    "Memory strength estimates how likely you are to recall each form today. " +
+                        "It is 90% when a form falls due and fades the longer it waits.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (fading.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        fading.take(5).forEachIndexed { i, f ->
+                            if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            val st = progress.state(f.id)!!.strength(today)
+                            Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(f.display, style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        "${paradigmById.getValue(f.paradigmId).lemma} · ${f.parse}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Text(percent(st), style = MaterialTheme.typography.labelLarge, color = strengthColor(st))
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(onClick = { onStrengthen(fading.take(20)) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Strengthen ${minOf(20, fading.size)} fading forms")
+                    }
+                } else if (seen > 0) {
+                    Text(
+                        "Nothing is fading. Keep up the daily reviews.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LocalExtraColors.current.mastered,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
 
                 SectionHeader("By topic")
                 Category.entries.forEach { c ->
@@ -75,6 +134,13 @@ fun StatsScreen(progress: Progress, today: Long, onBack: () -> Unit) {
                     Column(Modifier.padding(vertical = 8.dp)) {
                         Row {
                             Text(c.title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                            progress.strength(forms, today)?.let {
+                                Text(
+                                    "memory ${percent(it)} · ",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = strengthColor(it),
+                                )
+                            }
                             Text(
                                 "$m / ${forms.size}",
                                 style = MaterialTheme.typography.labelMedium,
@@ -83,6 +149,15 @@ fun StatsScreen(progress: Progress, today: Long, onBack: () -> Unit) {
                         }
                         Spacer(Modifier.height(6.dp))
                         MasteryBar(m, progress.seenCount(forms) - m, forms.size)
+                    }
+                }
+
+                val unlocked = Achievements.unlocked(progress)
+                SectionHeader("Achievements · ${unlocked.size} of ${Achievements.all.size}")
+                Achievements.all.chunked(2).forEach { pair ->
+                    Row(horizontalArrangement = SpacedBy8, modifier = Modifier.padding(vertical = 4.dp)) {
+                        pair.forEach { a -> AchievementTile(a, a.id in unlocked, Modifier.weight(1f)) }
+                        if (pair.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
 
@@ -120,9 +195,30 @@ fun StatsScreen(progress: Progress, today: Long, onBack: () -> Unit) {
     }
 }
 
+@Composable
+private fun AchievementTile(a: Achievement, unlocked: Boolean, modifier: Modifier) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (unlocked) MaterialTheme.colorScheme.tertiaryContainer
+            else MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        modifier = modifier.semantics { contentDescription = "${a.title}: ${a.detail}, ${if (unlocked) "unlocked" else "locked"}" },
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Text(
+                (if (unlocked) "🏆 " else "🔒 ") + a.title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = if (unlocked) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(a.detail, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
 /** One square per day, oldest at top-left, a column per week. */
 @Composable
-private fun ActivityGrid(days: Set<Long>, today: Long) {
+private fun ActivityGrid(days: Set<Long>, frozen: Set<Long>, today: Long) {
     val weeks = 16
     // Align so the last column ends today.
     val start = today - (weeks * 7 - 1)
@@ -142,7 +238,13 @@ private fun ActivityGrid(days: Set<Long>, today: Long) {
                             .fillMaxWidth()
                             .aspectRatio(1f)
                             .clip(RoundedCornerShape(2.dp))
-                            .background(if (day in days) on else off)
+                            .background(
+                                when (day) {
+                                    in days -> on
+                                    in frozen -> MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                                    else -> off
+                                }
+                            )
                     )
                 }
             }
@@ -173,12 +275,18 @@ fun SettingsScreen(
                     settings.shuffle,
                 ) { onChange(settings.copy(shuffle = it)) }
 
-                SectionHeader("Daily goal: ${settings.dailyGoal} answers")
+                SectionHeader("Daily goal: ${settings.dailyGoal} XP")
                 Slider(
                     value = settings.dailyGoal.toFloat(),
                     onValueChange = { onChange(settings.copy(dailyGoal = (it / 10).roundToInt() * 10)) },
                     valueRange = 10f..200f,
                     steps = 18,
+                )
+                Text(
+                    "Casual 20 · Regular 50 · Serious 100 · Intense 150. Harder questions earn more: " +
+                        "typing 15 XP, parsing 10, choosing 8, flashcards 5, plus a bonus for every 5 in a row.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 SectionHeader("New forms per review: ${settings.newPerReview}")
                 Slider(

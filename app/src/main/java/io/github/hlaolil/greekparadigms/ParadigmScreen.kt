@@ -17,11 +17,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,9 +48,12 @@ import io.github.hlaolil.greekparadigms.ui.theme.LocalExtraColors
 fun ParadigmScreen(
     paradigm: Paradigm,
     progress: Progress,
+    today: Long,
     onBack: () -> Unit,
     onStudy: (StudyMode, List<Form>) -> Unit,
 ) {
+    val nt = LocalNt.current
+    var details by rememberSaveable { mutableStateOf<String?>(null) }
     var weakOnly by rememberSaveable { mutableStateOf(false) }
     var covered by rememberSaveable { mutableStateOf(false) }
     val weak = paradigm.forms.filter { progress.state(it.id)?.mastered != true }
@@ -71,6 +76,34 @@ fun ParadigmScreen(
                 Spacer(Modifier.height(12.dp))
                 val mastered = progress.masteredCount(paradigm.forms)
                 MasteryBar(mastered, progress.seenCount(paradigm.forms) - mastered, paradigm.forms.size)
+                Spacer(Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val level = progress.level(paradigm)
+                    LevelDots(level)
+                    Text(
+                        "  Level $level",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    progress.strength(paradigm.forms, today)?.let {
+                        Text(
+                            "Memory ${percent(it)}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = strengthColor(it),
+                        )
+                    }
+                }
+                val occurrences = nt.occurrences(paradigm)
+                if (occurrences > 0) {
+                    Text(
+                        "These forms occur ${timesInNt(occurrences)} in the Greek New Testament.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
 
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
@@ -93,7 +126,8 @@ fun ParadigmScreen(
                     )
                 }
                 Spacer(Modifier.height(8.dp))
-                StudyMode.entries.chunked(2).forEach { pair ->
+                val modes = StudyMode.entries.filter { it != StudyMode.CONTEXT || paradigm.forms.any { f -> nt.hasExamples(f.id) } }
+                modes.chunked(2).forEach { pair ->
                     Row(horizontalArrangement = SpacedBy8, modifier = Modifier.padding(vertical = 4.dp)) {
                         pair.forEach { mode ->
                             ModeCard(mode, Modifier.weight(1f)) { onStudy(mode, studyForms) }
@@ -110,12 +144,122 @@ fun ParadigmScreen(
                     )
                 }
                 Spacer(Modifier.height(8.dp))
-                ParadigmTable(paradigm, progress, covered)
+                ParadigmTable(paradigm, progress, covered, onDetails = { details = it.id })
                 Spacer(Modifier.height(8.dp))
                 Legend()
+                if (!covered) {
+                    Text(
+                        "Tap a form to see it in the New Testament.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+
+                val common = paradigm.forms
+                    .filter { nt.frequency(it.id).exact > 0 }
+                    .sortedByDescending { nt.frequency(it.id).exact }
+                    .distinctBy { it.display }
+                    .take(3)
+                if (common.isNotEmpty()) {
+                    SectionHeader("Most common in the New Testament")
+                    common.forEach { f ->
+                        val ex = nt.examples(f.id).firstOrNull { it.exact }
+                        Card(
+                            onClick = { details = f.id },
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        ) {
+                            Column(Modifier.padding(14.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(f.display, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                                    Text(
+                                        timesInNt(nt.frequency(f.id).exact),
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.secondary,
+                                    )
+                                }
+                                Text(
+                                    f.parse,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                if (ex != null) {
+                                    Spacer(Modifier.height(6.dp))
+                                    NtPhrase(ex, Modifier.fillMaxWidth(), fontSize = 17.sp)
+                                    Text(
+                                        ex.reference,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
+    details?.let { id -> formById[id]?.let { FormDetails(it, progress, today, onDismiss = { details = null }) } }
+}
+
+/** A form's parsing, memory strength, NT frequency and every NT example available. */
+@Composable
+private fun FormDetails(form: Form, progress: Progress, today: Long, onDismiss: () -> Unit) {
+    val nt = LocalNt.current
+    val freq = nt.frequency(form.id)
+    val examples = nt.examples(form.id)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        title = { Text(form.display, style = MaterialTheme.typography.headlineMedium) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text(form.parse, style = MaterialTheme.typography.bodyLarge)
+                val also = Choices.allParses(form).filter { it.id != form.id }.map { it.parse }.distinct()
+                if (also.isNotEmpty()) {
+                    Text(
+                        "Also: ${also.joinToString("; ")}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                progress.state(form.id)?.takeIf { it.seen }?.let { st ->
+                    val strength = st.strength(today)
+                    Text(
+                        "Memory ${percent(strength)} · answered ${st.correct}/${st.reps} right · next review " +
+                            if (st.due <= today) "today" else "in ${st.due - today} day${if (st.due - today > 1) "s" else ""}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = strengthColor(strength),
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    when {
+                        freq.exact > 0 -> "Occurs ${timesInNt(freq.exact)} in the Greek New Testament."
+                        freq.pattern > 0 -> "This exact word isn't in the NT, but the pattern occurs ${timesInNt(freq.pattern)} in other verbs."
+                        nt.isEmpty -> ""
+                        else -> "This form doesn't occur in the Greek New Testament."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                examples.forEach { ex ->
+                    Spacer(Modifier.height(10.dp))
+                    NtPhrase(ex, Modifier.fillMaxWidth(), fontSize = 18.sp)
+                    Text(
+                        ex.reference + if (ex.exact) "" else " · ${ex.lemma}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        },
+    )
 }
 
 @Composable
@@ -135,7 +279,7 @@ private fun ModeCard(mode: StudyMode, modifier: Modifier, onClick: () -> Unit) {
 
 /** The paradigm as a grid, each cell tinted by how well it is known. */
 @Composable
-fun ParadigmTable(paradigm: Paradigm, progress: Progress, covered: Boolean) {
+fun ParadigmTable(paradigm: Paradigm, progress: Progress, covered: Boolean, onDetails: (Form) -> Unit = {}) {
     val extra = LocalExtraColors.current
     val revealed = remember(paradigm.id, covered) { mutableStateOf(setOf<String>()) }
     val outline = MaterialTheme.colorScheme.outlineVariant
@@ -185,8 +329,9 @@ fun ParadigmTable(paradigm: Paradigm, progress: Progress, covered: Boolean) {
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(if (hidden) MaterialTheme.colorScheme.surfaceContainerHighest else tint)
-                                    .clickable(enabled = covered) {
-                                        revealed.value = if (form.id in revealed.value) revealed.value - form.id
+                                    .clickable {
+                                        if (!covered) onDetails(form)
+                                        else revealed.value = if (form.id in revealed.value) revealed.value - form.id
                                         else revealed.value + form.id
                                     }
                                     .padding(vertical = 8.dp, horizontal = 4.dp)
@@ -234,6 +379,6 @@ private fun LegendDot(color: androidx.compose.ui.graphics.Color, label: String) 
 @Composable
 fun ParadigmScreenPreview() {
     GreekParadigmsTheme {
-        ParadigmScreen(paradigms.first(), Progress(), {}, { _, _ -> })
+        ParadigmScreen(paradigms.first(), Progress(), 0, {}, { _, _ -> })
     }
 }

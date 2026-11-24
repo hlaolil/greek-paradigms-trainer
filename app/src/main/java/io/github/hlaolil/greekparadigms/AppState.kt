@@ -44,6 +44,8 @@ class AppState(
     private val store: ProgressStore?,
     initial: Progress,
     private val clock: () -> Long = ::today,
+    /** NT occurrences and example phrases; empty in tests that don't load the asset. */
+    val corpus: NtCorpus = NtCorpus.EMPTY,
 ) {
     var progress by mutableStateOf(initial)
         private set
@@ -100,14 +102,47 @@ class AppState(
 
     fun replaceTop(screen: Screen) { backStack[backStack.lastIndex] = screen }
 
+    /** Achievements held when the current session began, to celebrate new ones at the end. */
+    var achievementsAtStart: Set<String> = Achievements.unlocked(initial)
+        private set
+
     fun startSession(title: String, mode: StudyMode, forms: List<Form>) {
         if (forms.isEmpty()) return
+        achievementsAtStart = Achievements.unlocked(progress)
         navigate(Screen.Study(Session.start(title, mode, forms, progress.settings.shuffle)))
     }
 
-    fun record(form: Form, correct: Boolean) {
+    /** Starts over in place, e.g. "practise the missed" from the results screen. */
+    fun restartSession(title: String, mode: StudyMode, forms: List<Form>) {
+        if (forms.isEmpty()) return
+        achievementsAtStart = Achievements.unlocked(progress)
+        replaceTop(Screen.Study(Session.start(title, mode, forms, progress.settings.shuffle)))
+    }
+
+    fun record(form: Form, correct: Boolean, xp: Int = 0) {
         refreshDay()
-        update(progress.record(form.id, correct, today))
+        update(progress.record(form.id, correct, today, xp))
+    }
+
+    /**
+     * Moves the session on after an answer: records the first attempt at each form for
+     * spaced repetition, and pays out the XP the answer earned.
+     */
+    fun answer(session: Session, correct: Boolean, asked: StudyMode) {
+        val form = session.current ?: return
+        val next = session.answer(correct, asked)
+        val gained = next.xp - session.xp
+        if (session.isFirstAttempt) record(form, correct, gained)
+        else if (gained > 0) { refreshDay(); update(progress.addXp(gained, today)) }
+        replaceTop(Screen.Study(next))
+    }
+
+    /** Pays the completion bonus once, when a session's results are first shown. */
+    fun finishSession(session: Session) {
+        if (!session.finished || session.rewarded) return
+        refreshDay()
+        update(progress.completeLesson(session.perfect, session.completionBonus, today))
+        if (screen == Screen.Study(session)) replaceTop(Screen.Study(session.copy(rewarded = true)))
     }
 
     fun updateSettings(settings: Settings) = update(progress.copy(settings = settings))
