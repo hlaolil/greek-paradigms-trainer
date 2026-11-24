@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
@@ -25,7 +26,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val store = ProgressStore(applicationContext)
-        state = AppState(store, store.load())
+        val corpus = runCatching {
+            NtCorpus.parse(assets.open("nt_examples.tsv").bufferedReader().use { it.readText() })
+        }.getOrDefault(NtCorpus.EMPTY)
+        state = AppState(store, store.load(), corpus = corpus)
         savedInstanceState?.getString(NAV_KEY)?.let { state.restoreNavigation(it) }
         setContent {
             // Roll the day over at midnight even if the app stays open.
@@ -67,41 +71,53 @@ fun App(state: AppState) {
     val progress = state.progress
     val today = state.today
 
-    when (val screen = state.screen) {
-        Screen.Home -> HomeScreen(
-            progress = progress,
-            today = today,
-            onOpen = { state.navigate(Screen.ParadigmDetail(it.id)) },
-            onReview = { state.startSession("Daily review", StudyMode.FLASHCARD, it) },
-            onStats = { state.navigate(Screen.Stats) },
-            onSettings = { state.navigate(Screen.Settings) },
-        )
+    CompositionLocalProvider(LocalNt provides state.corpus) {
+        when (val screen = state.screen) {
+            Screen.Home -> HomeScreen(
+                progress = progress,
+                today = today,
+                onOpen = { state.navigate(Screen.ParadigmDetail(it.id)) },
+                onReview = { state.startSession("Daily review", StudyMode.SMART, it) },
+                onLearn = { p -> state.startSession(p.lemma, StudyMode.SMART, p.forms.filter { progress.state(it.id)?.seen != true }) },
+                onStrengthen = { state.startSession("Strengthen", StudyMode.SMART, it) },
+                onStats = { state.navigate(Screen.Stats) },
+                onSettings = { state.navigate(Screen.Settings) },
+            )
 
-        is Screen.ParadigmDetail -> ParadigmScreen(
-            paradigm = paradigmById.getValue(screen.paradigmId),
-            progress = progress,
-            onBack = { state.back() },
-            onStudy = { mode, forms -> state.startSession(paradigmById.getValue(screen.paradigmId).lemma, mode, forms) },
-        )
+            is Screen.ParadigmDetail -> ParadigmScreen(
+                paradigm = paradigmById.getValue(screen.paradigmId),
+                progress = progress,
+                today = today,
+                onBack = { state.back() },
+                onStudy = { mode, forms -> state.startSession(paradigmById.getValue(screen.paradigmId).lemma, mode, forms) },
+            )
 
-        is Screen.Study -> StudyScreen(
-            session = screen.session,
-            settings = progress.settings,
-            onUpdate = { state.replaceTop(Screen.Study(it)) },
-            onRecord = { form, correct -> state.record(form, correct) },
-            onRestart = { forms, mode ->
-                state.replaceTop(Screen.Study(Session.start(screen.session.title, mode, forms, progress.settings.shuffle)))
-            },
-            onExit = { state.back() },
-        )
+            is Screen.Study -> {
+                val now = Achievements.unlocked(progress)
+                StudyScreen(
+                    session = screen.session,
+                    progress = progress,
+                    today = today,
+                    newAchievements = Achievements.all.filter { it.id in now && it.id !in state.achievementsAtStart },
+                    onAnswer = { correct, asked -> state.answer(screen.session, correct, asked) },
+                    onFinish = { state.finishSession(screen.session) },
+                    onRestart = { forms, mode -> state.restartSession(screen.session.title, mode, forms) },
+                    onExit = { state.back() },
+                )
+            }
 
-        Screen.Stats -> StatsScreen(progress, today, onBack = { state.back() })
+            Screen.Stats -> StatsScreen(
+                progress, today,
+                onBack = { state.back() },
+                onStrengthen = { state.startSession("Strengthen", StudyMode.SMART, it) },
+            )
 
-        Screen.Settings -> SettingsScreen(
-            settings = progress.settings,
-            onChange = { state.updateSettings(it) },
-            onReset = { state.resetProgress() },
-            onBack = { state.back() },
-        )
+            Screen.Settings -> SettingsScreen(
+                settings = progress.settings,
+                onChange = { state.updateSettings(it) },
+                onReset = { state.resetProgress() },
+                onBack = { state.back() },
+            )
+        }
     }
 }

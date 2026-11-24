@@ -191,8 +191,8 @@ private val indicative = listOf(
     ),
     finite(
         "eimi_impf", "εἰμί", "I was", "Imperfect indicative", I,
-        "1st singular ἤμην has a middle ending; 3rd singular ἦν.",
-        "ἤμην ἦς ἦν ἦμεν ἦτε ἦσαν",
+        "1st singular ἤμην has a middle ending; 3rd singular ἦν. The NT also has the older 2nd singular ἦσθα (Matt 26:69).",
+        "ἤμην ἦς/ἦσθα ἦν ἦμεν ἦτε ἦσαν",
     ),
     finite(
         "eimi_fut", "εἰμί", "I will be", "Future indicative", I,
